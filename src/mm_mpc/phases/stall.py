@@ -15,6 +15,8 @@ def apply_stalling(
     """
     Updates the 'stalled' flag. 
     If deg_in_sparse > T, edge is stalled.
+    
+    Enforces Monotonicity: Once stalled in a phase, stays stalled.
     """
     if config.R_rounds > 0:
         exponent = 1.0 / config.R_rounds
@@ -26,8 +28,9 @@ def apply_stalling(
         
     over_threshold = edge_state.deg_in_sparse > threshold
     
-    # Update state in-place
-    # Only currently active edges get stalled status updated
+    # Only active edges are candidates for stalling
     new_stalls = over_threshold & edge_state.active_mask
     
-    edge_state.stalled[:] = new_stalls
+    # Monotonic update: Union with existing stalls
+    # This prevents an edge from "unstalling" if degree variance occurs
+    edge_state.stalled[:] |= new_stalls
