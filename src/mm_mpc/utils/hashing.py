@@ -1,7 +1,7 @@
 """
 src/mm_mpc/utils/hashing.py
 Deterministic hashing utilities for MPC.
-Enforces Symmetric Edge IDs invariant: hash(u, v) == hash(v, u).
+Enforces Symmetric Edge IDs and consistent Ownership logic.
 """
 
 import struct
@@ -16,49 +16,41 @@ def init_seed(seed: int):
 
 def hash64(u: int, v: int = 0, phase: int = 0, iteration: int = 0, salt: str = "") -> int:
     """
-    Computes a deterministic 64-bit hash.
-    
-    CRITICAL INVARIANT:
-    hash64(u, v, ...) MUST EQUAL hash64(v, u, ...)
-    
-    We achieve this by sorting u and v.
+    Computes a deterministic 64-bit hash (Signed INT64).
     """
     # 1. Enforce Symmetry
-    # We use min/max to ensure (u,v) and (v,u) produce identical bytes
     low = u if u < v else v
     high = v if u < v else u
     
-    # 2. Pack data into binary struct for speed
-    # Q = unsigned long long (8 bytes)
-    # We pack: seed, low, high, phase, iteration
-    data = struct.pack("QQQQQ", _GLOBAL_SEED, low, high, phase, iteration)
+    # 2. Pack data "QqqQQ" -> Signed q for u, v
+    data = struct.pack("QqqQQ", _GLOBAL_SEED, low, high, phase, iteration)
     
     if salt:
         data += salt.encode('ascii')
         
-    # 3. Compute Hash (sha1 is standard and sufficient for distribution)
     h = hashlib.sha1(data).digest()
-    
-    # 4. Unpack first 8 bytes as unsigned 64-bit int
-    return struct.unpack("Q", h[:8])[0]
+    return struct.unpack("q", h[:8])[0]
 
 def get_vertex_owner(v: int, p_size: int) -> int:
-    """Map vertex to rank."""
-    # Salt ensures vertex distribution isn't identical to edge distribution
     h = hash64(v, 0, 0, 0, "vertex_owner")
-    return h % p_size
+    return abs(h) % p_size
+
+def get_edge_id(u: int, v: int) -> int:
+    """Generate the canonical Global ID (Signed)."""
+    return hash64(u, v, 0, 0, "eid")
+
+def get_edge_owner_from_id(eid: int, p_size: int) -> int:
+    """
+    Canonical logic for edge ownership.
+    Depends ONLY on the Global ID.
+    """
+    h = hash64(eid, 0, 0, 0, "edge_owner")
+    return abs(h) % p_size
 
 def get_edge_owner(u: int, v: int, p_size: int) -> int:
     """
-    Map edge to rank. 
-    Symmetric by definition of hash64.
+    Helper for graph loading. 
+    Computes ID first, then Owner, ensuring consistency.
     """
-    eid = hash64(u, v, 0, 0, "edge_owner")
-    return eid % p_size
-
-def get_edge_id(u: int, v: int) -> int:
-    """
-    Generate the canonical Global ID for an edge.
-    Symmetric by definition of hash64.
-    """
-    return hash64(u, v, 0, 0, "eid")
+    eid = get_edge_id(u, v)
+    return get_edge_owner_from_id(eid, p_size)
