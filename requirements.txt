@@ -1,3 +1,5 @@
 numpy
 mpi4py
 pytest
+networkx
+matplotlib
