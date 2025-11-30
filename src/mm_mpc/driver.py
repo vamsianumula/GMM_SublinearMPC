@@ -70,6 +70,11 @@ def run_driver_with_io(comm: MPI.Comm, config: MPCConfig, input_path: str):
         new_m = integrate.update_matching_and_prune(comm, edge_state, vertex_state, chosen, size)
         total_matches.extend(new_m)
         
+        # Log Matching Progress
+        global_new_matches = comm.allreduce(len(new_m), op=MPI.SUM)
+        if rank == 0:
+            print(f"[Metrics] Phase{phase}_NewMatches: {global_new_matches}")
+        
     extra = finish.finish_small_components(comm, edge_state, vertex_state, config)
     total_matches.extend(extra)
     
