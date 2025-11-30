@@ -43,8 +43,25 @@ def run_driver_with_io(comm: MPI.Comm, config: MPCConfig, input_path: str):
         # 2. Stall
         stall.apply_stalling(edge_state, phase, config)
         
+        # 2. Stall
+        stall.apply_stalling(edge_state, phase, config)
+        
         # 3. Exponentiate
+        from .utils import mpi_helpers
+        mpi_helpers.get_and_reset_metrics() # Clear previous
+        
         exponentiate.build_balls(comm, edge_state, vertex_state, config, participating_mask=part)
+        
+        p2_bytes = mpi_helpers.get_and_reset_metrics()
+        p2_edges = np.sum(part)
+        
+        # Aggregate Phase 2 Metrics
+        global_p2_bytes = comm.reduce(p2_bytes, op=MPI.SUM, root=0)
+        global_p2_edges = comm.reduce(p2_edges, op=MPI.SUM, root=0)
+        
+        if rank == 0 and global_p2_edges > 0:
+            print(f"[Metrics] Phase2_Round{phase}_Bytes: {global_p2_bytes}")
+            print(f"[Metrics] Phase2_Round{phase}_Edges: {global_p2_edges}")
         
         # 4. MIS (Pass the mask!)
         chosen = local_mis.run_greedy_mis(edge_state, phase, participating_mask=part)

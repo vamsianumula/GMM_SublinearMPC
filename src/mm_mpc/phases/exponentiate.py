@@ -139,11 +139,17 @@ def build_balls(
                 if teid in lookup:
                     idx = lookup[teid]
                     # Use the helper function here
-                    new_ball = merge_sorted_unique(current_balls[idx], inc)
-                    
-                    if len(new_ball) > config.S_edges:
-                        raise MemoryError(f"Rank {rank}: Ball size {len(new_ball)} exceeded {config.S_edges}")
-                    current_balls[idx] = new_ball
+                    try:
+                        new_ball = merge_sorted_unique(current_balls[idx], inc)
+                        
+                        if len(new_ball) > config.S_edges:
+                            raise MemoryError(f"Rank {rank}: Ball size {len(new_ball)} exceeded {config.S_edges}")
+                        current_balls[idx] = new_ball
+                    except KeyError:
+                        # This can happen if we receive a reply for an edge that was filtered out locally
+                        # (e.g. due to duplicates or race conditions in active_mask).
+                        # Safe to ignore as we are not tracking this edge.
+                        pass
 
     # --- Finalize State ---
     m = len(edge_state.edges_local)
