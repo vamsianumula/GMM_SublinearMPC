@@ -12,6 +12,14 @@ from typing import List, Any
 # This is small enough to fit in L3 cache/RAM easily, but large enough to saturate bandwidth.
 MAX_CHUNK_BYTES = 256 * 1024 * 1024 
 
+_TOTAL_BYTES_SENT = 0
+
+def get_and_reset_metrics():
+    global _TOTAL_BYTES_SENT
+    val = _TOTAL_BYTES_SENT
+    _TOTAL_BYTES_SENT = 0
+    return val 
+
 def exchange_buffers(
     comm: MPI.Comm, 
     send_buffers: List[List[Any]], 
@@ -149,6 +157,10 @@ def exchange_buffers(
             [flat_chunk_send, current_send_counts, chunk_send_displs, mpi_type],
             [flat_chunk_recv, current_recv_counts, chunk_recv_displs, mpi_type]
         )
+        
+        # Track Bytes
+        global _TOTAL_BYTES_SENT
+        _TOTAL_BYTES_SENT += flat_chunk_send.nbytes
         
         # G. Unpack / Reconstruction
         # Copy the received chunk data into the correct positions in the final buffers

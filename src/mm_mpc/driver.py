@@ -64,4 +64,12 @@ def run_driver_with_io(comm: MPI.Comm, config: MPCConfig, input_path: str):
             final_matching.extend(l)
         print(f"Done. Matching Size: {len(final_matching)}")
         
+    # Report Metrics
+    from .utils import mpi_helpers
+    local_bytes = mpi_helpers.get_and_reset_metrics()
+    total_bytes = comm.reduce(local_bytes, op=MPI.SUM, root=0)
+    
+    if rank == 0:
+        print(f"[Metrics] TotalCommBytes: {total_bytes}")
+        
     return final_matching
