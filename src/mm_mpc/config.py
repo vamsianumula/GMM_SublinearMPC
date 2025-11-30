@@ -15,6 +15,11 @@ class MPCConfig:
     small_threshold_factor: int = 100000
     random_seed: int = 42
     
+    # Metrics
+    enable_metrics: bool = True
+    enable_test_mode: bool = False
+    metrics_output_dir: str = "experiments/results/latest"
+    
     @classmethod
     def from_args(cls, args, mpi_size: int) -> 'MPCConfig':
         # Theoretical S = n^alpha
@@ -31,5 +36,8 @@ class MPCConfig:
             m_global=args.m_global,
             S_edges=s_edges,
             R_rounds=r_rounds,
-            mem_per_cpu_gb=args.mem_per_cpu
+            mem_per_cpu_gb=args.mem_per_cpu,
+            enable_metrics=args.metrics,
+            enable_test_mode=args.test_mode,
+            metrics_output_dir=args.metrics_out
         )

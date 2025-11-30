@@ -74,4 +74,9 @@ def run_greedy_mis(
         if is_local_max:
             chosen[idx] = True
             
-    return chosen
+    # Metrics
+    n_candidates = len(candidate_indices)
+    n_chosen = np.sum(chosen)
+    rate = n_chosen / n_candidates if n_candidates > 0 else 0.0
+    
+    return chosen, rate

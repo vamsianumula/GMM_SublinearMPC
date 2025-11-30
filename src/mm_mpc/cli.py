@@ -22,6 +22,11 @@ def main():
     parser.add_argument("--alpha", type=float, default=0.2)
     parser.add_argument("--mem", type=float, default=1.0)
     
+    # Metrics args
+    parser.add_argument("--no-metrics", action="store_true", help="Disable metrics collection")
+    parser.add_argument("--test-mode", action="store_true", help="Enable expensive correctness checks")
+    parser.add_argument("--metrics-out", type=str, default="experiments/results/latest", help="Output dir for metrics")
+    
     args = parser.parse_args()
     
     config = MPCConfig.from_args(
@@ -29,7 +34,10 @@ def main():
             'alpha': args.alpha,
             'n_global': args.n,
             'm_global': args.m,
-            'mem_per_cpu': args.mem
+            'mem_per_cpu': args.mem,
+            'metrics': not args.no_metrics,
+            'test_mode': args.test_mode,
+            'metrics_out': args.metrics_out
         }), size
     )
     

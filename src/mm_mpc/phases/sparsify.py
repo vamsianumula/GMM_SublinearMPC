@@ -70,3 +70,15 @@ def compute_deg_in_sparse(comm: MPI.Comm, edge_state: EdgeState, participating_m
                 
     for idx, total in accumulators.items():
         edge_state.deg_in_sparse[idx] = max(0, total - 2)
+        
+    # Metrics
+    active_indices = np.where(participating_mask)[0]
+    if len(active_indices) > 0:
+        degs = edge_state.deg_in_sparse[active_indices]
+        return {
+            "min": float(np.min(degs)),
+            "max": float(np.max(degs)),
+            "mean": float(np.mean(degs)),
+            "p95": float(np.percentile(degs, 95))
+        }
+    return {"min": 0.0, "max": 0.0, "mean": 0.0, "p95": 0.0}

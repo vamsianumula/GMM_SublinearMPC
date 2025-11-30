@@ -24,7 +24,8 @@ def build_balls(
     comm: MPI.Comm, 
     edge_state: EdgeState, 
     config: MPCConfig, 
-    participating_mask: Optional[np.ndarray] = None
+    participating_mask: Optional[np.ndarray] = None,
+    tracker=None
 ):
     rank = comm.Get_rank()
     size = comm.Get_size()
@@ -52,7 +53,7 @@ def build_balls(
                 send_bufs[owner].extend([target, eid, blen])
                 send_bufs[owner].extend(ball)
                 
-        recv_data = mpi_helpers.exchange_buffers(comm, send_bufs, dtype=np.int64)
+        recv_data = mpi_helpers.exchange_buffers(comm, send_bufs, dtype=np.int64, tracker=tracker)
         
         # 2. Vertex Aggregation
         v_inbox = defaultdict(list)
@@ -82,7 +83,7 @@ def build_balls(
                 reply_bufs[dest].extend([eid, sblen])
                 reply_bufs[dest].extend(super_b)
                 
-        recv_replies = mpi_helpers.exchange_buffers(comm, reply_bufs, dtype=np.int64)
+        recv_replies = mpi_helpers.exchange_buffers(comm, reply_bufs, dtype=np.int64, tracker=tracker)
         
         # 4. Merge Updates
         lookup = edge_state.id_to_index
@@ -117,3 +118,14 @@ def build_balls(
     for idx, ball in current_balls.items():
         start = edge_state.ball_offsets[idx]
         edge_state.ball_storage[start : start+len(ball)] = ball
+        
+    # Metrics
+    if len(lengths) > 0:
+        active_lengths = lengths[active_indices]
+        if len(active_lengths) > 0:
+            return {
+                "max": int(np.max(active_lengths)),
+                "mean": float(np.mean(active_lengths)),
+                "p95": float(np.percentile(active_lengths, 95))
+            }
+    return {"max": 0, "mean": 0.0, "p95": 0.0}
