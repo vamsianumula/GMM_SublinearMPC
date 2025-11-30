@@ -27,7 +27,14 @@ def run_driver_with_io(comm: MPI.Comm, config: MPCConfig, input_path: str):
     if rank == 0: 
         print(f"[Driver] Loaded. Edges: {len(local_edges)}")
     
-    for phase in range(12):
+    if rank == 0: 
+        print(f"[Driver] Loaded. Edges: {len(local_edges)}")
+    
+    # Adaptive State
+    prev_max_ball = 1
+    
+    # Increased max phases to allow for slower convergence with adaptive throttling
+    for phase in range(30):
         if logger: logger.tracker.reset_phase()
         
         n_active = np.sum(edge_state.active_mask)
@@ -39,24 +46,40 @@ def run_driver_with_io(comm: MPI.Comm, config: MPCConfig, input_path: str):
         if global_active == 0: 
             break
             
-        # 1. Sparsify
-        p_val = 0.5 
+        # 1. Adaptive Sparsification Probability
+        p_val = 0.5
+        if config.adaptive_sparsification:
+            est_ball_size = max(1, prev_max_ball * 2)
+            # Total Capacity = P * S * Safety
+            total_capacity = size * config.S_edges * config.safety_factor
+            # Estimated Load = Active * EstBallSize
+            est_load = global_active * est_ball_size
+            
+            if est_load > total_capacity:
+                p_val = total_capacity / est_load
+                # Clamp to reasonable bounds
+                p_val = max(0.0001, min(0.5, p_val))
+                
+            if rank == 0:
+                print(f"    [Adaptive] EstBall: {est_ball_size}, Load: {est_load:.0f}, Cap: {total_capacity:.0f} -> p={p_val:.6f}")
+
+        # 2. Sparsify
         part = sparsify.compute_phase_participation(edge_state, phase, 0, p_val)
         spars_stats = sparsify.compute_deg_in_sparse(comm, edge_state, part, size)
         
-        # 2. Stall
+        # 3. Stall
         stall_stats = stall.apply_stalling(edge_state, phase, config)
         
-        # 3. Exponentiate
+        # 4. Exponentiate
         # Pass tracker if metrics enabled
         tracker = logger.tracker if logger else None
         ball_stats = exponentiate.build_balls(comm, edge_state, config, participating_mask=part, tracker=tracker)
         
-        # 4. MIS
+        # 5. MIS
         # TODO: Update local_mis to accept tracker if we want to track its comm too
         chosen, mis_rate = local_mis.run_greedy_mis(edge_state, phase, participating_mask=part)
         
-        # 5. Integrate
+        # 6. Integrate
         # TODO: Update integrate to accept tracker
         new_m = integrate.update_matching_and_prune(comm, edge_state, chosen, size)
         total_matches.extend(new_m)
@@ -69,6 +92,11 @@ def run_driver_with_io(comm: MPI.Comm, config: MPCConfig, input_path: str):
             # Global Reductions for Metrics
             g_ball_max = comm.reduce(ball_stats["max"], op=MPI.MAX, root=0)
             g_ball_mean_sum = comm.reduce(ball_stats["mean"], op=MPI.SUM, root=0)
+            
+            # Update Adaptive State (Peak Hold Estimator)
+            current_max_ball = g_ball_max if rank == 0 else 1
+            current_max_ball = comm.bcast(current_max_ball, root=0)
+            prev_max_ball = max(prev_max_ball, current_max_ball)
             
             # Max Communication (Rank Bottleneck)
             local_comm_bytes = logger.tracker.bytes_sent
@@ -85,6 +113,8 @@ def run_driver_with_io(comm: MPI.Comm, config: MPCConfig, input_path: str):
                     active_edges=global_active,
                     matching_size=global_m_size,
                     delta_est=0, # TODO: Implement delta est
+                    
+                    sparsification_p=p_val,
                     
                     deg_min=spars_stats["min"],
                     deg_max=spars_stats["max"],

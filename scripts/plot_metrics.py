@@ -188,6 +188,22 @@ def plot_comm_sublinearity(data, output_dir):
     plt.savefig(os.path.join(output_dir, 'comm_sublinearity_items.png'))
     plt.close()
 
+def plot_sparsification_p(phases, output_dir):
+    indices = [p['phase_idx'] for p in phases]
+    p_vals = [p.get('sparsification_p', 0.5) for p in phases]
+    
+    plt.figure(figsize=(10, 6))
+    plt.plot(indices, p_vals, marker='o', color='magenta', label='Sparsification p')
+    
+    plt.xlabel('Phase')
+    plt.ylabel('Probability p')
+    plt.title('Adaptive Sparsification: p vs Phase')
+    plt.ylim(0, 0.6)
+    plt.grid(True)
+    plt.legend()
+    plt.savefig(os.path.join(output_dir, 'sparsification_p.png'))
+    plt.close()
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("json_file", help="Path to metrics_run.json")
@@ -213,6 +229,7 @@ def main():
     plot_degree_stats(phases, args.out)
     plot_sublinearity(data, args.out)
     plot_comm_sublinearity(data, args.out)
+    plot_sparsification_p(phases, args.out)
     
     print("Done.")
 

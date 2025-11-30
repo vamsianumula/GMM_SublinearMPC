@@ -26,6 +26,7 @@ def main():
     parser.add_argument("--no-metrics", action="store_true", help="Disable metrics collection")
     parser.add_argument("--test-mode", action="store_true", help="Enable expensive correctness checks")
     parser.add_argument("--metrics-out", type=str, default="experiments/results/latest", help="Output dir for metrics")
+    parser.add_argument("--safety-factor", type=float, default=1.0, help="Safety factor for adaptive sparsification (0.0-1.0)")
     
     args = parser.parse_args()
     
@@ -37,7 +38,8 @@ def main():
             'mem_per_cpu': args.mem,
             'metrics': not args.no_metrics,
             'test_mode': args.test_mode,
-            'metrics_out': args.metrics_out
+            'metrics_out': args.metrics_out,
+            'safety_factor': args.safety_factor
         }), size
     )
     

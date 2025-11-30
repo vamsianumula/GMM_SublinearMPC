@@ -37,6 +37,8 @@ class PhaseMetrics:
     
     mis_selection_rate: float
     
+    sparsification_p: float = 0.5
+    
     # Degree Stats (Added later, must have defaults)
     deg_min: float = 0.0
     deg_max: float = 0.0

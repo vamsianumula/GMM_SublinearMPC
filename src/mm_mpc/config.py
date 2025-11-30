@@ -15,6 +15,10 @@ class MPCConfig:
     small_threshold_factor: int = 100000
     random_seed: int = 42
     
+    # Adaptive Sparsification
+    adaptive_sparsification: bool = True
+    safety_factor: float = 1.0
+    
     # Metrics
     enable_metrics: bool = True
     enable_test_mode: bool = False
@@ -39,5 +43,6 @@ class MPCConfig:
             mem_per_cpu_gb=args.mem_per_cpu,
             enable_metrics=args.metrics,
             enable_test_mode=args.test_mode,
-            metrics_output_dir=args.metrics_out
+            metrics_output_dir=args.metrics_out,
+            safety_factor=getattr(args, 'safety_factor', 1.0)
         )
