@@ -5,6 +5,7 @@ Metrics subsystem for GMM Sublinear MPC.
 
 import json
 import os
+import sys
 import time
 import numpy as np
 from dataclasses import dataclass, field, asdict
@@ -42,6 +43,7 @@ class PhaseMetrics:
     deg_max: float = 0.0
     deg_mean: float = 0.0
     deg_p95: float = 0.0
+    deg_hist: Dict[str, int] = field(default_factory=dict) # Bucket -> Count
     
     # Optional / Heavy
     ball_growth_factors: List[float] = field(default_factory=list)
@@ -69,6 +71,9 @@ class RunMetrics:
     # Test Mode
     approximation_ratio: Optional[float] = None
     maximality_violation_rate: Optional[float] = None
+    
+    # System Stats
+    peak_memory_per_rank: Dict[int, int] = field(default_factory=dict)
 
 class MetricsTracker:
     """
@@ -146,3 +151,4 @@ class MetricsLogger:
                     f.write(",".join(row) + "\n")
             
             print(f"[Metrics] Dumped to {output_dir}")
+            sys.stdout.flush()

@@ -3,6 +3,8 @@ src/mm_mpc/driver.py
 Main Driver.
 """
 import time
+import resource
+import sys
 import numpy as np
 from mpi4py import MPI
 from .config import MPCConfig
@@ -90,8 +92,10 @@ def run_driver_with_io(comm: MPI.Comm, config: MPCConfig, input_path: str):
                     deg_max=spars_stats["max"],
                     deg_mean=spars_stats["mean"],
                     deg_p95=spars_stats["p95"],
+                    deg_hist=spars_stats.get("hist", {}),
                     
                     stalling_rate=stall_stats["rate"],
+                    
                     stalling_rate_by_bucket={},
                     ball_max=g_ball_max,
                     ball_mean=g_ball_mean,
@@ -109,6 +113,11 @@ def run_driver_with_io(comm: MPI.Comm, config: MPCConfig, input_path: str):
     all_lists = comm.gather(total_matches, root=0)
     final_matching = []
     
+    # Gather Peak Memory (All ranks must participate)
+    if logger:
+        local_peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        all_peaks = comm.gather(local_peak, root=0)
+    
     if rank == 0:
         for l in all_lists: 
             final_matching.extend(l)
@@ -118,6 +127,11 @@ def run_driver_with_io(comm: MPI.Comm, config: MPCConfig, input_path: str):
             logger.run_metrics.global_matching_size = len(final_matching)
             logger.run_metrics.S_edges = config.S_edges
             logger.run_metrics.n_global = config.n_global
+            
+            for r, p in enumerate(all_peaks):
+                logger.run_metrics.peak_memory_per_rank[r] = p
+            
+            sys.stdout.flush()
             logger.finalize_and_dump()
         
     return final_matching

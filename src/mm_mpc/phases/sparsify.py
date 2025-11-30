@@ -75,10 +75,25 @@ def compute_deg_in_sparse(comm: MPI.Comm, edge_state: EdgeState, participating_m
     active_indices = np.where(participating_mask)[0]
     if len(active_indices) > 0:
         degs = edge_state.deg_in_sparse[active_indices]
+        
+        # Compute Histogram (Log Bins)
+        # Bins: 0, 1, 2, 4, 8, 16, ...
+        max_deg = np.max(degs)
+        if max_deg > 0:
+            bins = np.logspace(0, np.log10(max_deg), num=20)
+            bins = np.unique(np.floor(bins))
+            if bins[0] > 0: bins = np.insert(bins, 0, 0)
+        else:
+            bins = [0, 1]
+            
+        hist, bin_edges = np.histogram(degs, bins=bins)
+        hist_dict = {f"{int(bin_edges[i])}-{int(bin_edges[i+1])}": int(hist[i]) for i in range(len(hist)) if hist[i] > 0}
+
         return {
             "min": float(np.min(degs)),
-            "max": float(np.max(degs)),
+            "max": float(max_deg),
             "mean": float(np.mean(degs)),
-            "p95": float(np.percentile(degs, 95))
+            "p95": float(np.percentile(degs, 95)),
+            "hist": hist_dict
         }
-    return {"min": 0.0, "max": 0.0, "mean": 0.0, "p95": 0.0}
+    return {"min": 0.0, "max": 0.0, "mean": 0.0, "p95": 0.0, "hist": {}}

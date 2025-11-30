@@ -124,6 +124,54 @@ def plot_degree_stats(phases, output_dir):
     plt.savefig(os.path.join(output_dir, 'degree_stats.png'))
     plt.close()
 
+def plot_degree_histograms(phases, output_dir):
+    # Select a few phases to plot (e.g., first, middle, last)
+    n = len(phases)
+    if n == 0: return
+    
+    indices = [0, n//2, n-1]
+    indices = sorted(list(set(indices))) # Unique
+    
+    plt.figure(figsize=(10, 6))
+    
+    for idx in indices:
+        p = phases[idx]
+        hist = p.get('deg_hist', {})
+        if not hist: continue
+        
+        # Parse "min-max" keys to get centers
+        centers = []
+        counts = []
+        for k, v in hist.items():
+            try:
+                parts = k.split('-')
+                low, high = int(parts[0]), int(parts[1])
+                center = (low + high) / 2
+                centers.append(center)
+                counts.append(v)
+            except:
+                continue
+                
+        # Sort by center
+        if centers:
+            sorted_pairs = sorted(zip(centers, counts))
+            centers, counts = zip(*sorted_pairs)
+            
+            # Normalize
+            total = sum(counts)
+            density = [c/total for c in counts]
+            
+            plt.plot(centers, density, marker='o', label=f'Phase {p["phase_idx"]}')
+            
+    plt.xlabel('Degree (Log Scale)')
+    plt.ylabel('Density')
+    plt.xscale('log')
+    plt.title('Degree Peeling Effect')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig(os.path.join(output_dir, 'degree_peeling.png'))
+    plt.close()
+
 def plot_sublinearity(data, output_dir):
     phases = data.get('phases', [])
     S_edges = data.get('S_edges', 0)
@@ -211,6 +259,7 @@ def main():
     plot_stalling(phases, args.out)
     plot_system(phases, args.out)
     plot_degree_stats(phases, args.out)
+    plot_degree_histograms(phases, args.out)
     plot_sublinearity(data, args.out)
     plot_comm_sublinearity(data, args.out)
     

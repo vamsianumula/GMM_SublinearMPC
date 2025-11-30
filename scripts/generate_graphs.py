@@ -38,9 +38,35 @@ def generate_dense_small(n=100, p=0.1):
     G = nx.erdos_renyi_graph(n, p, seed=42)
     write_edge_list(G, "dense_small.txt")
 
+import argparse
+
+def generate_custom(type, n, p=None, d=None, output="custom.txt"):
+    print(f"Generating {type} Graph (n={n})...")
+    if type == "dense":
+        G = nx.erdos_renyi_graph(n, p, seed=42)
+    elif type == "regular":
+        G = nx.random_regular_graph(d, n, seed=42)
+    elif type == "star":
+        G = nx.star_graph(n-1)
+    else:
+        print(f"Unknown type: {type}")
+        return
+    write_edge_list(G, output)
+
 if __name__ == "__main__":
-    random.seed(42)
-    generate_dense(n=1000, p=0.05) # ~25k edges
-    generate_star(n=1000)          # ~1k edges
-    generate_regular(n=1000, d=3)  # ~1.5k edges
-    generate_dense_small(n=100, p=0.1)  # ~1.5k edges
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--type", choices=["dense", "regular", "star", "all"], default="all")
+    parser.add_argument("--n", type=int, default=1000)
+    parser.add_argument("--p", type=float, default=0.05)
+    parser.add_argument("--d", type=int, default=3)
+    parser.add_argument("--out", default="graph.txt")
+    args = parser.parse_args()
+    
+    if args.type == "all":
+        random.seed(42)
+        generate_dense(n=1000, p=0.05)
+        generate_star(n=1000)
+        generate_regular(n=1000, d=3)
+        generate_dense_small(n=100, p=0.1)
+    else:
+        generate_custom(args.type, args.n, args.p, args.d, args.out)
