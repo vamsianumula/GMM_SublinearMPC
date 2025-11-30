@@ -16,6 +16,9 @@ def run_driver_with_io(comm: MPI.Comm, config: MPCConfig, input_path: str):
     
     local_edges, local_ids = load_and_distribute_graph(comm, input_path)
     edge_state = init_edge_state(local_edges, local_ids)
+    # Initialize VertexState
+    from .state_layout import init_vertex_state
+    vertex_state = init_vertex_state(comm, edge_state)
     
     total_matches = []
     
@@ -35,22 +38,22 @@ def run_driver_with_io(comm: MPI.Comm, config: MPCConfig, input_path: str):
         # 1. Sparsify
         p_val = 0.5 
         part = sparsify.compute_phase_participation(edge_state, phase, 0, p_val)
-        sparsify.compute_deg_in_sparse(comm, edge_state, part, size)
+        sparsify.compute_deg_in_sparse(comm, edge_state, vertex_state, part, size)
         
         # 2. Stall
         stall.apply_stalling(edge_state, phase, config)
         
         # 3. Exponentiate
-        exponentiate.build_balls(comm, edge_state, config, participating_mask=part)
+        exponentiate.build_balls(comm, edge_state, vertex_state, config, participating_mask=part)
         
         # 4. MIS (Pass the mask!)
         chosen = local_mis.run_greedy_mis(edge_state, phase, participating_mask=part)
         
         # 5. Integrate
-        new_m = integrate.update_matching_and_prune(comm, edge_state, chosen, size)
+        new_m = integrate.update_matching_and_prune(comm, edge_state, vertex_state, chosen, size)
         total_matches.extend(new_m)
         
-    extra = finish.finish_small_components(comm, edge_state, config)
+    extra = finish.finish_small_components(comm, edge_state, vertex_state, config)
     total_matches.extend(extra)
     
     all_lists = comm.gather(total_matches, root=0)

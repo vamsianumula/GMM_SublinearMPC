@@ -43,11 +43,15 @@ def test_sparsification_logic():
     # Init State
     state = init_edge_state(local_edges, local_ids)
     
+    # Initialize VertexState
+    from mm_mpc.state_layout import init_vertex_state
+    vertex_state = init_vertex_state(comm, state)
+    
     # 2. Run Sparsification (p=1.1 -> All participate)
     participating = sparsify.compute_phase_participation(state, phase=1, iteration=0, p_val=1.1)
     
     # 3. Compute Degrees
-    sparsify.compute_deg_in_sparse(comm, state, participating, size)
+    sparsify.compute_deg_in_sparse(comm, state, vertex_state, participating, size)
     
     # 4. Verify Degrees
     # Triangle: deg_L = 2

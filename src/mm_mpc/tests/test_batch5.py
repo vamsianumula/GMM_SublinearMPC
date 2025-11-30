@@ -1,5 +1,5 @@
 import os
-import pytest
+import os
 from mpi4py import MPI
 from mm_mpc.driver import run_driver_with_io
 from mm_mpc.config import MPCConfig

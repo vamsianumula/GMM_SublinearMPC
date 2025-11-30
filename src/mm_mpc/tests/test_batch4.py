@@ -37,6 +37,10 @@ def test_exponentiation_and_mis():
         
     state = init_edge_state(local_edges, local_ids)
     
+    # Initialize VertexState
+    from mm_mpc.state_layout import init_vertex_state
+    vertex_state = init_vertex_state(comm, state)
+    
     # 2. Run Exponentiation
     config = MPCConfig(alpha=0.5, n_global=4, m_global=3, 
                        S_edges=100, R_rounds=1, mem_per_cpu_gb=1.0)
@@ -44,7 +48,7 @@ def test_exponentiation_and_mis():
     # Simulate that all edges participate in this phase
     all_participating = np.ones(len(local_edges), dtype=bool)
     
-    exponentiate.build_balls(comm, state, config, participating_mask=all_participating)
+    exponentiate.build_balls(comm, state, vertex_state, config, participating_mask=all_participating)
     
     # Verify Ball Contents for Edge (1,2)
     target_eid = hashing.get_edge_id(1, 2)

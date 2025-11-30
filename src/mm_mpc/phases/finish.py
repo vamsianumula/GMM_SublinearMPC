@@ -22,9 +22,11 @@ def solve_sequential_greedy(edges: np.ndarray) -> list:
 def finish_small_components(
     comm: MPI.Comm,
     edge_state: EdgeState,
+    vertex_state: EdgeState,
     config: MPCConfig
 ) -> list:
     rank = comm.Get_rank()
+    size = comm.Get_size()
     
     # 1. Check Global Size
     active_indices = np.where(edge_state.active_mask)[0]
@@ -35,14 +37,55 @@ def finish_small_components(
         return []
         
     # Safety Threshold
-    # If remaining edges > Threshold, gathering is unsafe.
     threshold = config.S_edges * config.small_threshold_factor
     
     if global_count > threshold:
         if rank == 0:
             print(f"[Finish] WARNING: Remaining edges ({global_count}) exceeds "
-                  f"safety threshold ({threshold}). Skipping sequential finish.")
-        return []
+                  f"safety threshold ({threshold}). Switching to Distributed Finishing.")
+        
+        # Distributed Fallback Loop
+        from . import exponentiate, local_mis, integrate
+        
+        extra_matches = []
+        # Run 5 rounds of standard MIS on the remaining graph
+        # We temporarily set R=1 in config for this? Or just pass R=1?
+        # Exponentiate uses config.R_rounds. We can temporarily patch it or create a temp config.
+        
+        # Create a temp config with R=1
+        from dataclasses import replace
+        temp_config = replace(config, R_rounds=1)
+        
+        for i in range(5):
+            if rank == 0: print(f"[Finish] Distributed Round {i+1}")
+            
+            # 1. Build 1-hop balls (on ALL active edges, no sparsification)
+            # We pass participating_mask=None (implies all active & non-stalled)
+            # But we should ensure nothing is stalled?
+            # Stall logic might have left some edges stalled. We should unstall them?
+            # Yes, for finishing, we want to process everything.
+            edge_state.stalled[:] = False
+            
+            try:
+                exponentiate.build_balls(comm, edge_state, vertex_state, temp_config, participating_mask=None)
+            except MemoryError:
+                if rank == 0: print("[Finish] OOM during fallback. Aborting finish.")
+                break
+                
+            # 2. MIS
+            chosen = local_mis.run_greedy_mis(edge_state, phase=999+i, participating_mask=None)
+            
+            # 3. Integrate
+            new_m = integrate.update_matching_and_prune(comm, edge_state, vertex_state, chosen, size)
+            extra_matches.extend(new_m)
+            
+            # Check if done
+            n_active = np.sum(edge_state.active_mask)
+            g_active = comm.allreduce(n_active, op=MPI.SUM)
+            if g_active == 0:
+                break
+                
+        return extra_matches
 
     # 2. Gather active edges
     my_edges = edge_state.edges_local[active_indices]

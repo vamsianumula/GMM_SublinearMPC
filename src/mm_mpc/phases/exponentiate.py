@@ -23,6 +23,7 @@ def merge_sorted_unique(arr1: np.ndarray, arr2: np.ndarray) -> np.ndarray:
 def build_balls(
     comm: MPI.Comm, 
     edge_state: EdgeState, 
+    vertex_state: EdgeState,
     config: MPCConfig, 
     participating_mask: Optional[np.ndarray] = None
 ):
@@ -54,27 +55,67 @@ def build_balls(
                 
         recv_data = mpi_helpers.exchange_buffers(comm, send_bufs, dtype=np.int64)
         
-        # 2. Vertex Aggregation
+        # 2. Vertex Aggregation (Using VertexState)
+        # We need to map incoming 'v' to local row index.
+        # Then, for each 'v', we collect the incoming balls.
+        # AND we need to add the incident edges of 'v' that are in H_s.
+        # Wait, the exponentiation step says:
+        # "For each ball-id e that touches v, we want to add all incident sparse edges to e’s neighbor list."
+        # Incident sparse edges are those in `vertex_state.adj_storage` that are ALSO participating?
+        # Yes. But `adj_storage` stores local edge indices.
+        # We need to check if those edges are participating.
+        
         v_inbox = defaultdict(list)
         v_subscribers = defaultdict(list)
+        
         for r_buf in recv_data:
             cursor = 0
             n = len(r_buf)
             while cursor < n:
                 tv, seid, length = r_buf[cursor], r_buf[cursor+1], r_buf[cursor+2]
                 cursor += 3
+                # We own tv (guaranteed by routing), so we process it.
+                # Even if we don't have local edges incident to it.
                 v_inbox[tv].append(r_buf[cursor : cursor+length])
                 v_subscribers[tv].append(seid)
                 cursor += length
                 
         # 3. Reply to Edges
         reply_bufs = [[] for _ in range(size)]
+        
         for v, balls in v_inbox.items():
-            if not balls: 
-                super_b = np.array([], dtype=np.int64)
-            else: 
-                # Optimization: concat then unique is faster than iterative union
-                super_b = np.unique(np.concatenate(balls))
+            incident_eids = []
+            
+            # Gather incident edges from CSR (if we have any)
+            if v in vertex_state.vertex_id_to_row:
+                row_idx = vertex_state.vertex_id_to_row[v]
+                start = vertex_state.adj_offsets[row_idx]
+                end = vertex_state.adj_offsets[row_idx+1]
+                local_incident_indices = vertex_state.adj_storage[start:end]
+                
+                for local_idx in local_incident_indices:
+                    # Check if this edge is participating in this phase
+                    is_participating = False
+                    if participating_mask is not None:
+                        if participating_mask[local_idx]:
+                            is_participating = True
+                    else:
+                        if edge_state.active_mask[local_idx] and not edge_state.stalled[local_idx]:
+                            is_participating = True
+                            
+                    if is_participating:
+                        incident_eids.append(edge_state.edge_ids[local_idx])
+            
+            incident_eids_arr = np.array(incident_eids, dtype=np.int64)
+            
+            # Merge incoming balls + incident edges
+            if not balls:
+                super_b = incident_eids_arr
+            else:
+                # Optimization: concat then unique
+                # We unite all incoming balls AND the incident edges
+                combined = balls + [incident_eids_arr]
+                super_b = np.unique(np.concatenate(combined))
             
             sblen = len(super_b)
             for eid in v_subscribers[v]:

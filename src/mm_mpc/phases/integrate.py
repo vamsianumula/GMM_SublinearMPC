@@ -11,6 +11,7 @@ from ..utils import mpi_helpers, hashing
 def update_matching_and_prune(
     comm: MPI.Comm,
     edge_state: EdgeState,
+    vertex_state: EdgeState,
     chosen_mask: np.ndarray,
     p_size: int
 ) -> list:
@@ -47,6 +48,8 @@ def update_matching_and_prune(
     my_matched_verts = set()
     for buf in recv_matches:
         for v in buf:
+            # We own this vertex (guaranteed by routing), so we track it.
+            # Even if we don't have local edges incident to it, we must answer queries about it.
             my_matched_verts.add(v)
             
     # 2. Filter Active Edges (The "Kill" Phase)

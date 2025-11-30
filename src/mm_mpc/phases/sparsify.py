@@ -22,7 +22,8 @@ def compute_phase_participation(edge_state: EdgeState, phase: int, iteration: in
                 participating[i] = True
     return participating
 
-def compute_deg_in_sparse(comm: MPI.Comm, edge_state: EdgeState, participating_mask: np.ndarray, p_size: int):
+def compute_deg_in_sparse(comm: MPI.Comm, edge_state: EdgeState, vertex_state: EdgeState, participating_mask: np.ndarray, p_size: int):
+    # Note: vertex_state type hint is actually VertexState but we avoid circular import or just use Any
     edge_state.deg_in_sparse[:] = 0
     local_indices = np.where(participating_mask)[0]
     
@@ -39,20 +40,43 @@ def compute_deg_in_sparse(comm: MPI.Comm, edge_state: EdgeState, participating_m
         
     recv_lists = mpi_helpers.exchange_buffers(comm, send_bufs, dtype=np.int64)
     
+    # 2. Vertex Count (Using VertexState)
+    # We need to map incoming 'v' to local row index to store counts?
+    # Actually, for just counting, we can use a temporary array aligned with vertex_ids
+    # But since we need to reply to specific EIDs, we just need to know the count for 'v'.
+    # We can use vertex_state.vertex_id_to_row to validate ownership and (if needed) store state.
+    # For this phase, we just need the count.
+    
+    # We can use a dict for the *current phase* counts, or a dense array if we trust vertex_ids.
+    # Let's use a dict for now to be safe, but populated only for owned vertices.
+    # Wait, the requirement is to avoid python objects for *adjacency*. 
+    # Temporary dicts for message processing are okay if they don't persist or explode.
+    # But let's try to use the dense array approach if possible.
+    
+    n_local = len(vertex_state.vertex_ids)
+    # We can't easily index by 'v' directly if v is arbitrary 64-bit.
+    # We MUST use vertex_id_to_row.
+    
     # 2. Vertex Count
+    # We use a defaultdict to count degrees for ALL owned vertices (including ghosts).
+    # This is a temporary structure for the phase, so it's allowed.
     v_counts = defaultdict(int)
     v_requests = defaultdict(list)
+    
+    # Pass 1: Aggregate
     for r_data in recv_lists:
         n = len(r_data)
         for k in range(0, n, 2):
             v, eid = r_data[k], r_data[k+1]
+            # We own v (guaranteed by routing), so we count it.
             v_counts[v] += 1
             v_requests[v].append(eid)
             
     # 3. Reply to Edge
     reply_bufs = [[] for _ in range(p_size)]
-    for v, count in v_counts.items():
-        for eid in v_requests[v]:
+    for v, eids in v_requests.items():
+        count = v_counts[v]
+        for eid in eids:
             dest = hashing.get_edge_owner_from_id(eid, p_size)
             reply_bufs[dest].extend([eid, count])
             
