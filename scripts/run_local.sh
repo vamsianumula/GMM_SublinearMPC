@@ -20,6 +20,7 @@ echo "--- Running MPC Maximal Matching on Local Machine ---"
 echo "Ranks: $NP"
 echo "Input: $INPUT"
 
+
 PYTHONPATH=src mpirun -n $NP python3 -m mm_mpc.cli \
     --input "$INPUT" \
     --n 1000 \

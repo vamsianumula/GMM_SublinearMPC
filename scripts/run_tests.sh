@@ -16,6 +16,7 @@ echo "Running New Unit Tests..."
 mpirun -n 4 python3 src/mm_mpc/tests/unit/test_vertex_state.py
 mpirun -n 4 python3 src/mm_mpc/tests/unit/test_sublinearity.py
 mpirun -n 4 python3 src/mm_mpc/tests/unit/test_finishing.py
+mpirun -n 4 python3 src/mm_mpc/tests/unit/test_correctness_graphs.py
 
 echo "Running Verification Script..."
 mpirun -n 4 python3 scripts/verify_fixes.py

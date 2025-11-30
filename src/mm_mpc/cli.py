@@ -21,6 +21,8 @@ def main():
     parser.add_argument("--m", type=int, required=True, help="Num edges")
     parser.add_argument("--alpha", type=float, default=0.2)
     parser.add_argument("--mem", type=float, default=1.0)
+    parser.add_argument("--S_edges", type=int, default=None, help="Override S_edges")
+    parser.add_argument("--R_rounds", type=int, default=None, help="Override R_rounds")
     
     args = parser.parse_args()
     
@@ -29,7 +31,9 @@ def main():
             'alpha': args.alpha,
             'n_global': args.n,
             'm_global': args.m,
-            'mem_per_cpu': args.mem
+            'mem_per_cpu': args.mem,
+            'S_edges': args.S_edges,
+            'R_rounds': args.R_rounds
         }), size
     )
     

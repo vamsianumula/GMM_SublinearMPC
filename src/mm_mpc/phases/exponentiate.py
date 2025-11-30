@@ -151,6 +151,12 @@ def build_balls(
     lengths = np.zeros(m, dtype=np.int64)
     for idx, ball in current_balls.items(): 
         lengths[idx] = len(ball)
+        
+    # Instrumentation for Sublinearity Verification
+    if len(lengths) > 0:
+        max_ball = np.max(lengths)
+        print(f"[Metrics] Rank {rank} MaxBallSize: {max_ball}")
+        
     np.cumsum(lengths, out=edge_state.ball_offsets[1:])
     
     total = edge_state.ball_offsets[-1]
