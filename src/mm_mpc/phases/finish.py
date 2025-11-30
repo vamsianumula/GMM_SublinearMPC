@@ -40,7 +40,7 @@ def finish_small_components(
     
     if global_count > threshold:
         if rank == 0:
-            print(f"[Finish] WARNING: Remaining edges ({global_active}) exceeds "
+            print(f"[Finish] WARNING: Remaining edges ({global_count}) exceeds "
                   f"safety threshold ({threshold}). Skipping sequential finish.")
         return []
 
